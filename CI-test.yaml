@@ -1,0 +1,31 @@
+---
+  trigger:
+    - develop
+
+  pool:
+    vmimage: 'windows-2019'
+
+  steps:
+    - task: NuGetToolInstaller@0
+
+    - task: NuGetCommand@2
+      inputs:
+        restoreSolution: "**/*.sln"
+  
+    - task: VSBuild@1
+      inputs:
+        solution: "**/*.sln"
+        msbuildArgs: ' /p:DeployOnBuild=True /p:WebPublishMethod=Package /p:PackageAsSingleFiles=True /p:SkipInvalidCongigurations=True /p:PackageLocation="$(build.artifactstagingdirectory)\\"'
+
+    - task: CopyFiles@1
+      inputs: 
+        SourceFolder: ARM_Template/
+        Contents: "*.json"
+        TargetFolder: $(build.artifactstagingdirectory)
+    
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: $(build.artifactstagingdirectory)
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+        

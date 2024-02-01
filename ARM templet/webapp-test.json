@@ -1,0 +1,68 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "serviceplan-Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter service plan name:"
+            }
+        },
+        "webapp-name": {
+            "type": "string",
+            // "defaultValue": "satya-dev",
+            "metadata": {
+                "description": "Enter service plan name"
+            }
+        },
+        "SKU": {
+            "type": "string",
+            "metadata": {
+                "description": "provied SKU value"
+            },
+            "allowedValues":[
+                "F1",
+                "B1"
+            ]
+        }
+    },
+    "variables": {
+        // "webapp-name": "[concat('satya-dev',uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "name": "[parameters('serviceplan-Name')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2022-09-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[parameters('SKU')]",
+                "capacity": 1
+            },
+            "tags": {
+                "displayName": "[parameters('serviceplan-Name')]"
+            },
+            "properties": {
+                "name": "[parameters('serviceplan-Name')]"
+            }
+        },
+        {
+            "name": "[parameters('webapp-name')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2022-09-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/appServicePlan1')]": "Resource",
+                "displayName": "[parameters('webapp-name')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serviceplan-Name'))]"
+            ],
+            "properties": {
+                "name": "[parameters('webapp-name')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serviceplan-Name'))]"
+            }
+        }
+    ],
+    "outputs": {}
+}
