@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>DevOps_Web_App</RootNamespace>
+    <AssemblyName>DevOps_Web-App</AssemblyName>
+    <ApplicationIcon>DevOps_Web-App.sln</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="DevOps_Web-App.sln" />
+  </ItemGroup>
+
+</Project>
