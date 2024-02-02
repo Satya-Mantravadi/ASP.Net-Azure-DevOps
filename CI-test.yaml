@@ -1,31 +1,79 @@
 ---
-  trigger:
-    - develop
+trigger:
+- develop
 
-  pool:
-    vmimage: 'windows-2019'
+pool:
+  vmImage: 'windows latest'
 
-  steps:
-    - task: NuGetToolInstaller@0
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+  ResourceGroup: "CICD-Test"
+  ServicePlan: "Satya-sp-dev"
+  WebappName: "Satyatest-Dev"
 
-    - task: NuGetCommand@2
-      inputs:
-        restoreSolution: "**/*.sln"
-  
-    - task: VSBuild@1
-      inputs:
-        solution: "**/*.sln"
-        msbuildArgs: ' /p:DeployOnBuild=True /p:WebPublishMethod=Package /p:PackageAsSingleFiles=True /p:SkipInvalidCongigurations=True /p:PackageLocation="$(build.artifactstagingdirectory)\\"'
+stages:
 
-    - task: CopyFiles@1
-      inputs: 
-        SourceFolder: ARM_Template/
-        Contents: "*.json"
-        TargetFolder: $(build.artifactstagingdirectory)
-    
-    - task: PublishBuildArtifacts@1
-      inputs:
-        PathtoPublish: $(build.artifactstagingdirectory)
-        ArtifactName: 'drop'
-        publishLocation: 'Container'
+- stage: Build
+  displayName: Build Stage
+  jobs:
+    - job: Build
+      displayName: Build Stage
+
+      steps:
+       - task: NuGetToolInstaller@1
+
+       - task: NuGetCommand@2
+         inputs:
+          restoreSolution: '$(solution)'
+
+       - task: VSBuild@1
+         inputs:
+          solution: '$(solution)'
+          msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
+          platform: '$(buildPlatform)'
+          configuration: '$(buildConfiguration)'
+
+       - task: VSTest@2
+         inputs:
+          platform: '$(buildPlatform)'
+          configuration: '$(buildConfiguration)'
+
+       - task: PublishBuildArtifacts@1
+         inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+
+- stage: Release
+  displayName: Release Stage
+  jobs:
+    - deployment:
+      environment: Dev
+      strategy:
+       runOnce:
+         deploy:
+           steps:
+             - task: AzureResourceManagerTemplateDeployment@3
+               inputs:
+                 deploymentScope: 'Resource Group'
+                 azureResourceManagerConnection: 'Satya (32be7bff-4778-4260-b57d-c79fd88f9556)'
+                 subscriptionId: '32be7bff-4778-4260-b57d-c79fd88f9556'
+                 action: 'Create Or Update Resource Group'
+                 resourceGroupName: '$(ResourceGroup)'
+                 location: 'East US'
+                 templateLocation: 'Linked artifact'
+                 csmFile: '$(Pipeline.Workspace)/drop/**/webapp-test.json'
+                 csmParametersFile: '$(Pipeline.Workspace)/drop/**/parameter-test.json'
+                 overrideParameters: '-ServicePlan-Name $(ServicePlan) -Webapp-Name $(WebappName)'
+                 deploymentMode: 'Incremental'
+
+             - task: AzureRmWebAppDeployment@4
+               inputs:
+                 ConnectionType: 'AzureRM'
+                 azureSubscription: 'Satya (32be7bff-4778-4260-b57d-c79fd88f9556)'
+                 appType: 'webApp'
+                 WebAppName: '$(WebappName)'
+                 packageForLinux: '$(Pipeline.Workspace)/**/*.zip'
         
