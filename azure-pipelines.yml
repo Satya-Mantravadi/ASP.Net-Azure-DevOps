@@ -13,22 +13,70 @@ variables:
   solution: '**/*.sln'
   buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
+  ResourceGroup: "CICD-Test"
+  ServicePlan: "Satya-sp-dev"
+  WebappName: "Satya-Dev"
 
-steps:
-- task: NuGetToolInstaller@1
+stages:
 
-- task: NuGetCommand@2
-  inputs:
-    restoreSolution: '$(solution)'
+- stage: Build
+  displayName: Build Stage
+  jobs:
+    - job: Build
+      displayName: Build Stage
 
-- task: VSBuild@1
-  inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+      steps:
+       - task: NuGetToolInstaller@1
 
-- task: VSTest@2
-  inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+       - task: NuGetCommand@2
+         inputs:
+          restoreSolution: '$(solution)'
+
+       - task: VSBuild@1
+         inputs:
+          solution: '$(solution)'
+          msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"'
+          platform: '$(buildPlatform)'
+          configuration: '$(buildConfiguration)'
+
+       - task: VSTest@2
+         inputs:
+          platform: '$(buildPlatform)'
+          configuration: '$(buildConfiguration)'
+
+       - task: PublishBuildArtifacts@1
+         inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+
+- stage: Release
+  displayName: Release Stage
+  jobs:
+    - deployment:
+      environment: Dev
+      strategy:
+       runOnce:
+         deploy:
+           steps:
+             - task: AzureResourceManagerTemplateDeployment@3
+               inputs:
+                 deploymentScope: 'Resource Group'
+                 azureResourceManagerConnection: 'Satya (32be7bff-4778-4260-b57d-c79fd88f9556)'
+                 subscriptionId: '32be7bff-4778-4260-b57d-c79fd88f9556'
+                 action: 'Create Or Update Resource Group'
+                 resourceGroupName: '$(ResourceGroup)'
+                 location: 'East US'
+                 templateLocation: 'Linked artifact'
+                 csmFile: '$(Pipeline.Workspace)/drop/**/webapp-test.json'
+                 csmParametersFile: '$(Pipeline.Workspace)/drop/**/parameter-test.json'
+                 overrideParameters: '-ServicePlan-Name $(ServicePlan) -webapp-Name $(webappName)'
+                 deploymentMode: 'Incremental'
+
+             - task: AzureRmWebAppDeployment@4
+               inputs:
+                 ConnectionType: 'AzureRM'
+                 azureSubscription: 'Satya (32be7bff-4778-4260-b57d-c79fd88f9556)'
+                 appType: 'webApp'
+                 WebAppName: '$(webappName)'
+                 packageForLinux: '$(Pipeline.Workspace)/**/*.zip'
